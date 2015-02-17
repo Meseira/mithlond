@@ -1,0 +1,157 @@
+#!/bin/bash
+
+# Mithlond: manage control groups for LXC unprivileged containers
+
+# Copyright (C) 2015 Xavier Gendre
+
+# This file is part of Mithlond.
+
+# Mithlond is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# Mithlond is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with Mithlond. If not, see <http://www.gnu.org/licenses/>.
+
+# Usual locations in PATH
+export PATH=$PATH:/usr/sbin:/usr/bin:/sbin:/bin
+
+# Version
+MITHLOND_MAJOR=0
+MITHLOND_MINOR=1
+MITHLOND_VERSION="$MITHLOND_MAJOR.$MITHLOND_MINOR"
+
+BASENAME=$(basename $0)
+
+chown_group() {
+  [ -z "$1" ] && fail "user is not specified"
+  id --user $1 > /dev/null || fail "cannot get uid for $1"
+  id --group $1 > /dev/null || fail "cannot get gid for $1"
+  [ -z "$2" ] && fail "group is not specified"
+  local USER_ID=$(id --user $1)
+  local GROUP_ID=$(id --group $1)
+  for SUBSYS in /sys/fs/cgroup/*; do
+    chown -R $USER_ID:$GROUP_ID $SUBSYS/$2 || fail "cannot chown the group $2"
+  done
+  return 0
+}
+
+create_group() {
+  [ -z "$1" ] && fail "group is not specified"
+  for SUBSYS in /sys/fs/cgroup/*; do
+    mkdir -p $SUBSYS/$1 || fail "cannot create the group $1"
+  done
+  return 0
+}
+
+fail() {
+  echo "$BASENAME: $1" 1>&2
+  exit 1
+}
+
+get_user_list() {
+  if [ -f MITHLOND_CONF_DIR/mithlond.conf ]; then
+    source <(cat MITHLOND_CONF_DIR/mithlond.conf | grep ^USERS)
+  fi
+  echo $USERS
+}
+
+give_pid() {
+  for GRP in /sys/fs/cgroup/*; do
+    echo $1 >> $GRP/$2/tasks || fail "cannot give pid $1 to the group $2"
+  done
+  return 0
+}
+
+lxc_start() {
+  give_pid $$ $1
+  lxc-start -n $2 -d
+}
+
+print_help() {
+  usage $1
+  cat <<EOF
+
+chown USER GROUP  give GROUP ownership to USER in all the cgroup subsystems
+create GROUP      create a new cgroup GROUP in all the cgroup subsystems
+give PID GROUP    attach the task of PID to the cgroup GROUP
+help              print the help
+start GROUP LUNT  start container LUNT in the cgroup GROUP
+subscribe USER    add USER to the user list
+unsubscribe USER  remove USER from the user list
+version           print the version
+EOF
+  return 0
+}
+
+usage() {
+  cat <<EOF
+Usage: $1 COMMAND [ PARAMETERS ]
+       COMMAND := { chown | create | give | help | start | subscribe | unsubscribe | version }
+EOF
+  return 0
+}
+
+user_add() {
+  [ -z "$1" ] && fail "user is not specified"
+  id --user $1 > /dev/null || fail "unknown user $1"
+  USER_LIST=$(get_user_list)
+  (echo $USER_LIST | grep --silent $1) || USER_LIST="$USER_LIST:$1"
+  USER_LIST=$(echo $USER_LIST | sed 's/^://')
+  grep --silent ^USERS MITHLOND_CONF_DIR/mithlond.conf 2> /dev/null
+  if [ $? -eq 0 ]; then
+    cat MITHLOND_CONF_DIR/mithlond.conf | sed $(echo 's%^USERS=".*"%USERS="'$(eval echo $USER_LIST)'"%') > MITHLOND_CONF_DIR/mithlond.conf
+  else
+    echo "USERS=\"$USER_LIST\"" >> MITHLOND_CONF_DIR/mithlond.conf
+  fi
+  return 0
+}
+
+user_del() {
+  [ -z $1 ] && fail "user is not specified"
+  USER_LIST=$(get_user_list | sed $(echo 's%'$(eval echo $1)'%%'))
+  USER_LIST=$(echo $USER_LIST | sed 's/^://')
+  USER_LIST=$(echo $USER_LIST | sed 's/:$//')
+  USER_LIST=$(echo $USER_LIST | sed 's/::/:/')
+  grep --silent ^USERS MITHLOND_CONF_DIR/mithlond.conf 2> /dev/null
+  if [ $? -eq 0 ]; then
+    cat MITHLOND_CONF_DIR/mithlond.conf | sed $(echo 's%^USERS=".*"%USERS="'$(eval echo $USER_LIST)'"%') > MITHLOND_CONF_DIR/mithlond.conf
+  else
+    echo "USERS=\"$USER_LIST\"" >> MITHLOND_CONF_DIR/mithlond.conf
+  fi
+  return 0
+}
+
+version() {
+  cat <<EOF
+Mithlond $MITHLOND_VERSION
+Copyright (C) 2015 Xavier Gendre
+This program comes with ABSOLUTELY NO WARRANTY.
+This is free software, and you are welcome to redistribute it
+under certain conditions.
+EOF
+  return 0
+}
+
+if [ -z "$1" ]; then
+  usage $BASENAME
+  exit 1
+fi
+
+case $1 in
+  "chown")       chown_group $2 $3;;
+  "create")      create_group $2;;
+  "give")        give_pid $2 $3;;
+  "help")        print_help $BASENAME;;
+  "start")       lxc_start $2 $3;;
+  "subscribe")   user_add $2;;
+  "unsubscribe") user_del $2;;
+  "version")     version;;
+  *)             fail "unknown command $1" && exit 1;;
+esac

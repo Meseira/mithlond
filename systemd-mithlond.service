@@ -1,0 +1,9 @@
+[Unit]
+Description=Mithlond
+
+[Service]
+Type=oneshot
+ExecStart=/lib/systemd/mithlond
+
+[Install]
+WantedBy=multi-user.target

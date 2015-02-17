@@ -1,0 +1,76 @@
+#!/bin/bash
+
+# Installation script for Mithlond
+
+# Copyright (C) 2015 Xavier Gendre
+
+# This file is part of Mithlond.
+
+# Mithlond is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# Mithlond is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with Mithlond. If not, see <http://www.gnu.org/licenses/>.
+
+clean() {
+  rm -f mithlond.sed
+  rm -f *.tmp
+  return 0
+}
+
+fail() {
+  echo "$BASENAME: $1"
+  clean
+  exit 1
+}
+
+give_to_root() {
+  chown root:root $1 || fail "cannot chown file $1"
+}
+
+source mithlond.config
+
+for VAR in $MITHLOND_VAR; do
+  echo 's%'"$VAR"'%'$(eval echo "\$$VAR")'%g'
+done > mithlond.sed
+
+# Main script
+cat mithlond | sed -f mithlond.sed > mithlond.tmp
+give_to_root mithlond.tmp
+chmod 755 mithlond.tmp || fail "cannot chmod file mithlond.tmp"
+mv -f mithlond.tmp $MITHLOND_BIN_DIR/mithlond
+
+# Kernel variables
+cp sysctl-mithlond.conf sysctl-mithlond.conf.tmp
+give_to_root sysctl-mithlond.conf.tmp
+mv -f sysctl-mithlond.conf.tmp /etc/sysctl.d/mithlond.conf
+
+# Systemd service and script
+cat systemd-mithlond | sed -f mithlond.sed > systemd-mithlond.tmp
+give_to_root systemd-mithlond.tmp
+chmod 755 systemd-mithlond.tmp
+mv -f systemd-mithlond.tmp /lib/systemd/mithlond
+
+cp systemd-mithlond.service systemd-mithlond.service.tmp
+give_to_root systemd-mithlond.service.tmp
+mv -f systemd-mithlond.service.tmp /lib/systemd/system/mithlond.service
+systemctl enable mithlond.service
+
+# Configuration file
+cat > mithlond.conf.tmp <<EOF
+# Mithlond configuration file
+
+# User list (e.g. user1:user2:user3)
+USERS=""
+EOF
+give_to_root mithlond.conf.tmp
+mv -f mithlond.conf.tmp $MITHLOND_CONF_DIR/mithlond.conf
+
+clean

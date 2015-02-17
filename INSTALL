@@ -1,0 +1,6 @@
+Installation
+============
+
+To install Mithlond in Debian Jessie, simply run the script called `install` as system administrator. This script copies files in appropriate folders, enable the Systemd service for Mithlond and set a basic configuration file with no user.
+
+You can now add the users to Mithlond's user list with the help of the command `mithlond subscribe USER` and reboot to take into consideration all the changes.
