@@ -49,6 +49,6 @@ Currently, Mithlond can only handle the parameters `lxc.start.auto` and `lxc.sta
 Issues
 ------
 
-If you encounter any problem with this image, do not hesitate to report it in a [GitHub issue][1].
+If you encounter any problem with this software, do not hesitate to report it in a [GitHub issue][1].
 
   [1]: https://github.com/Meseira/mithlond/issues
