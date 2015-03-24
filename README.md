@@ -12,7 +12,7 @@ The goal of Mithlond is to help to manage control groups for LXC unprivileged co
 Compatibility
 -------------
 
-Mithlond has only be tested with Debian Jessie for the time being. Do not hesitate to report your testings on other systems.
+Mithlond has only been tested with Debian Jessie for the time being. Do not hesitate to report your testings on other systems.
 
 Basic usage
 -----------
