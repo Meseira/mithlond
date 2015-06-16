@@ -37,7 +37,8 @@ chown_group() {
   local USER_ID=$(id --user $1)
   local GROUP_ID=$(id --group $1)
   for SUBSYS in /sys/fs/cgroup/*; do
-    chown -R $USER_ID:$GROUP_ID $SUBSYS/$2 || fail "cannot chown the group $2"
+    chown $USER_ID:$GROUP_ID $SUBSYS/$2 || fail "cannot chown the group $2"
+    chown $USER_ID:$GROUP_ID $SUBSYS/$2/tasks || fail "cannot chown tasks in $SUBSYS/$2"
   done
   return 0
 }
